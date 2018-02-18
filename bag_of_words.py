@@ -8,32 +8,32 @@ import sys
 def main():
     if len(sys.argv) != 2:
         raise Exception("usage: python train.csv")
-    # inputfile = sys.argv[1]
-    # df = pd.read_csv(inputfile, header = 0)
+    inputfile = sys.argv[1]
+    df = pd.read_csv(inputfile, header = 0)
     descriptions = df['item_description'].as_matrix()
-    # descriptions = ["The dog is black", "Cows are white"]
     count = 0
     vocabulary = dict()
     masterLength = len(descriptions)
     for i in range (0, masterLength):
         vocabulary, count = build_vocabulary(descriptions[i], count, vocabulary)
-    df['description_encoding'] = pd.Series(np.zeros(masterLength), index = df.index)
-    encodings = np.zeros((len(vocabulary), len(descriptions)))
+    encodings = []
     for i in range (0, len(descriptions)):
-        df.at[i, 'description_encoding'] = create_document_vector(sentenceToArr(descriptions[i]), vocabulary))
+        encodings.append(str(create_document_vector(sentenceToArr(descriptions[i]), vocabulary)))
+    df['encodings'] = pd.Series(encodings, index = df.index)
     df.to_csv('train_enc.csv', index = False)
 
-def build_vocabulary(sentence, Count, dictionary):
+def build_vocabulary(sentence, Count, vocabulary):
     # For each word in words vector put in dictionary with index
     words= sentenceToArr(sentence)
+    print words
     count = Count
     for word in words:
-        if word in dictionary:
+        if word in vocabulary:
             count = count
         else:
             count = count + 1
-            dictionary[word] = count
-    return dictionary, count
+            vocabulary[word] = count
+    return vocabulary, count
 
 def sentenceToArr(sentence):
     return re.split(' |; |, |\*|\n',sentence)

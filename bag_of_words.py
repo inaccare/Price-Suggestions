@@ -7,18 +7,23 @@ import sys
 
 def main():
     if len(sys.argv) != 2:
-        raise Exception("usage: python train.csv")
+        raise Exception("usage: python bag_of_words.py train.csv")
     inputfile = sys.argv[1]
     df = pd.read_csv(inputfile, header = 0)
     descriptions = df['item_description'].as_matrix()
     count = 0
     vocabulary = dict()
     masterLength = len(descriptions)
+    lengths = [int(masterLength/8), int(masterLength/4), int(3*masterLength/8), int(masterLength/2),int(5*masterLength/8), int(3*masterLength/4), int(7*masterLength/8)]
     for i in range (0, masterLength):
         if (pd.isnull(descriptions[i]) == False):
             vocabulary, count = build_vocabulary(descriptions[i], count, vocabulary)
     encodings = []
+    j = 0
     for i in range (0, len(descriptions)):
+        if i == lengths[j]:
+            j = j+ 1
+            print "Currently ", j, "/8 of the way through encoding"
         if (pd.isnull(descriptions[i]) == False):
             encodings.append(create_document_vector(sentenceToArr(descriptions[i]), vocabulary))
         else:

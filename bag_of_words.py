@@ -18,6 +18,7 @@ def main():
     for i in range (0, masterLength):
         if (pd.isnull(descriptions[i]) == False):
             vocabulary, count = build_vocabulary(descriptions[i].lower(), count, vocabulary)
+    writeVocabLengthToFile(len(vocabulary))
     encodings = []
     j = 0
     for i in range (0, len(descriptions)):
@@ -33,6 +34,11 @@ def main():
     df['encodings'] = pd.Series(encodings, index = df.index)
     # print df['encodings']
     df.to_csv('train_enc.csv', index = False)
+
+def writeVocabLengthToFile(vocabLength):
+    fp = open('vocab-length.txt', 'w')
+    fp.write('Length of vocabulary is ' + str(vocabLength) +'.')
+    fp.close()
 
 def build_vocabulary(sentence, Count, vocabulary):
     # For each word in words vector put in dictionary with index

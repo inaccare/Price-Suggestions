@@ -21,22 +21,32 @@ def main():
         testCSV = sys.argv[2]
     trainDF = pd.read_csv(trainCSV, header = 0)
     trainDF = trainDF.truncate(before = 0, after = 100)  # Using this for now so it runs. Take out when training all of them
-    X_train = getProductEncodings(trainDF)
+    X_train, Y_train = getProductEncodingsAndPrices(trainDF)
     # print ("number of training examples = " + str(X_train.shape[1]))
     # print ("number of test examples = " + str(X_test.shape[1]))
     print ("X_train shape: " + str(X_train.shape))
-    # print ("Y_train shape: " + str(Y_train.shape))
+    print ("Y_train shape: " + str(Y_train.shape))
     # print ("X_test shape: " + str(X_test.shape))
     # print ("Y_test shape: " + str(Y_test.shape))
     # parameters = model(X_train, Y_train, X_test, Y_test)
 
 # Function looks at the dataframe and returns matrix of description encodings for all samples such that X.shape = (n_x, m)
-def getProductEncodings(df):
+def getProductEncodingsAndPrices(df):
     X = []
+    Y = []
+    numBuckets = 12
     vocabLength = 517153  #Look at vocab-length for this value. Everytime bag_of_words is run, this file is written to.
     for i in range(0, len(df['encodings'])):
         X.append(expandArray(df['encodings'][i], vocabLength))
-    return np.array(X).T
+        Y.append(OneHot(int(df['price-bucket'][i]), numBuckets))
+    X= np.array(X).T
+    Y= np.array(Y).T
+    return X, Y
+
+def OneHot(bucket, numBuckets):
+    arr = np.zeros(numBuckets)
+    arr[bucket] = 1
+    return arr
 
 # Turns encodings of variable size (related to sentence length) to encodings of vector length corresponding to length of vocab
 def expandArray(List, vocabLength):

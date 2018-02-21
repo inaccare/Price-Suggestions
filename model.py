@@ -1,12 +1,16 @@
-
 # Import data
-import tensorflow as tf
-import numpy as np
 import pandas as pd
 import re
 import sys
-import matplotlib.pyplot as plt
 import time
+import math
+import numpy as np
+import h5py
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.python.framework import ops
+import tensorflow_utils
+from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
 def main():
     # Usage is as follows: python model.py <train_enc>.csv <test_enc>.csv(optional)
@@ -28,7 +32,7 @@ def main():
     print ("Y_train shape: " + str(Y_train.shape))
     # print ("X_test shape: " + str(X_test.shape))
     # print ("Y_test shape: " + str(Y_test.shape))
-    # parameters = model(X_train, Y_train, X_test, Y_test)
+    parameters = model(X_train, Y_train)#, X_test, Y_test)
 
 # Function looks at the dataframe and returns matrix of description encodings for all samples such that X.shape = (n_x, m)
 def getProductEncodingsAndPrices(df):
@@ -57,7 +61,7 @@ def expandArray(List, vocabLength):
             arr[(int)(i)] = 1
     return arr
 
-def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
+def model(X_train, Y_train, learning_rate = 0.0001,
           num_epochs = 1500, minibatch_size = 32, print_cost = True):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
@@ -77,8 +81,8 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
     """
 
     ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
-    # tf.set_random_seed(1)                             # to keep consistent results
-    # seed = 3                                          # to keep consistent results
+    tf.set_random_seed(1)                             # to keep consistent results
+    seed = 3                                          # to keep consistent results
     (n_x, m) = X_train.shape                          # (n_x: input size, m : number of examples in the train set)
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
@@ -90,7 +94,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
 
     # Initialize parameters
     ### START CODE HERE ### (1 line)
-    parameters = initialize_parameters()
+    parameters = initialize_parameters(n_x, m, n_y)
     ### END CODE HERE ###
 
     # Forward propagation: Build the forward propagation in the tensorflow graph
@@ -190,7 +194,7 @@ def create_placeholders(n_x, n_y):
 
     return X, Y
 
-def initialize_parameters():
+def initialize_parameters(n_x, m, n_y):
     """
     Initializes parameters to build a neural network with tensorflow. The shapes are:
                         W1 : [25, 12288]
@@ -207,12 +211,12 @@ def initialize_parameters():
     tf.set_random_seed(1)                   # so that your "random" numbers match ours
 
     ### START CODE HERE ### (approx. 6 lines of code)
-    W1 = tf.get_variable("W1", [25,12288], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+    W1 = tf.get_variable("W1", [25,n_x], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
     b1 = tf.get_variable("b1", [25, 1], initializer= tf.zeros_initializer())
     W2 = tf.get_variable("W2", [12, 25], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
     b2 = tf.get_variable("b2", [12, 1], initializer = tf.zeros_initializer())
-    W3 = tf.get_variable("W3", [6, 12], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
-    b3 = tf.get_variable("b3", [6, 1], initializer = tf.zeros_initializer())
+    W3 = tf.get_variable("W3", [12, 12], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+    b3 = tf.get_variable("b3", [12, 1], initializer = tf.zeros_initializer())
     ### END CODE HERE ###
 
     parameters = {"W1": W1,
@@ -277,8 +281,6 @@ def compute_cost(Z3, Y):
     ### END CODE HERE ###
 
     return cost
-
-
 
 if __name__ == "__main__":
     main()

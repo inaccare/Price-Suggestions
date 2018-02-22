@@ -9,8 +9,8 @@ import h5py
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.python.framework import ops
-import tensorflow_utils
-from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
+# import tensorflow_utils
+# from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
 def main():
     # Usage is as follows: python model.py <train_enc>.csv <test_enc>.csv(optional)
@@ -28,23 +28,69 @@ def main():
     X_train, Y_train = getProductEncodingsAndPrices(trainDF)
     # print ("number of training examples = " + str(X_train.shape[1]))
     # print ("number of test examples = " + str(X_test.shape[1]))
-    print ("X_train shape: " + str(X_train.shape))
+    print ("X_train shape: " + str(len(X_train)))
     print ("Y_train shape: " + str(Y_train.shape))
     # print ("X_test shape: " + str(X_test.shape))
     # print ("Y_test shape: " + str(Y_test.shape))
     parameters = model(X_train, Y_train)#, X_test, Y_test)
+
+def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
+    """
+    Creates a list of random minibatches from (X, Y)
+    
+    Arguments:
+    X -- input data, of shape (input size, number of examples)
+    Y -- true "label" vector (containing 0 if cat, 1 if non-cat), of shape (1, number of examples)
+    mini_batch_size - size of the mini-batches, integer
+    seed -- this is only for the purpose of grading, so that you're "random minibatches are the same as ours.
+    
+    Returns:
+    mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
+    """
+    
+    m = len(X)                 # number of training examples
+    mini_batches = []
+    np.random.seed(seed)
+    
+    # Step 1: Shuffle (X, Y)
+    permutation = list(np.random.permutation(m))
+    shuffled_X = X[permutation]
+    shuffled_Y = Y[:, permutation].reshape((Y.shape[0],m))
+
+    # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
+    num_complete_minibatches = int(math.floor(m/mini_batch_size)) # number of mini batches of size mini_batch_size in your partitionning
+    for k in range(0, num_complete_minibatches):
+        mini_batch_X = shuffled_X[k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch_Y = shuffled_Y[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+    
+    # Handling the end case (last mini-batch < mini_batch_size)
+    if m % mini_batch_size != 0:
+        mini_batch_X = shuffled_X[num_complete_minibatches * mini_batch_size : m]
+        mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size : m]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+    
+    return mini_batches
+
+def expandMinibatchArrays(minibatch_X):
+    X = []
+    vocabLength = 517153  #Look at vocab-length for this value. Everytime bag_of_words is run, this file is written to.
+    for sample in minibatch_X:
+        X.append(expandArray(sample, vocabLength))
+    return np.array(X).T
 
 # Function looks at the dataframe and returns matrix of description encodings for all samples such that X.shape = (n_x, m)
 def getProductEncodingsAndPrices(df):
     X = []
     Y = []
     numBuckets = 12
-    vocabLength = 517153  #Look at vocab-length for this value. Everytime bag_of_words is run, this file is written to.
     for i in range(0, len(df['encodings'])):
-        X.append(expandArray(df['encodings'][i], vocabLength))
+        X.append(df['encodings'][i])
         Y.append(OneHot(int(df['price-bucket'][i]), numBuckets))
-    X= np.array(X).T
     Y= np.array(Y).T
+    X = np.array(X).T
     return X, Y
 
 def OneHot(bucket, numBuckets):
@@ -83,7 +129,7 @@ def model(X_train, Y_train, learning_rate = 0.0001,
     ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
     tf.set_random_seed(1)                             # to keep consistent results
     seed = 3                                          # to keep consistent results
-    (n_x, m) = X_train.shape                          # (n_x: input size, m : number of examples in the train set)
+    (n_x, m) =  517153, len(X_train)                        # (n_x: input size, m : number of examples in the train set)
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
 
@@ -137,6 +183,7 @@ def model(X_train, Y_train, learning_rate = 0.0001,
                 # IMPORTANT: The line that runs the graph on a minibatch.
                 # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
                 ### START CODE HERE ### (1 line)
+                minibatch_X = expandMinibatchArrays(minibatch_X)
                 _ , minibatch_cost = sess.run([optimizer, cost], feed_dict = {X:minibatch_X, Y:minibatch_Y})
                 ### END CODE HERE ###
 

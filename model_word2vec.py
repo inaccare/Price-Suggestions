@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.python.framework import ops
 import json
-# import codec
 # import tensorflow_utils
 # from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
@@ -26,16 +25,46 @@ def main():
     if (len(sys.argv) == 3):
         devCSV = sys.argv[2]
     trainDF = pd.read_csv(trainCSV, header = 0)
-    trainDF = trainDF.truncate(before = 0, after = 100)
+#    trainDF = trainDF.truncate(before = 0, after = 10000)
     X_train, Y_train = getProductEncodingsAndPrices(trainDF)
     devDF = pd.read_csv(devCSV, header = 0)
+#    devDF = devDF.truncate(before = 0, after = 99)
     X_dev, Y_dev = getProductEncodingsAndPrices(devDF)
-    print ("X_train shape: " + str(len(X_train)))
-    print ('X_train: ', X_train)
+    print ("X_train shape: " + str(X_train.shape))
     print ("Y_train shape: " + str(Y_train.shape))
     print ("X_dev shape: " + str(X_dev.shape))
     print ("Y_dev shape: " + str(Y_dev.shape))
-    parameters = model(X_train, Y_train, X_dev, Y_dev, num_epochs = 1)
+    parameters = model(X_train, Y_train, X_dev, Y_dev, num_epochs = 100)
+
+def readInArray(word2vecList):
+    word2vecList = str(word2vecList)
+    vecList = []
+    splitArr = word2vecList.split()
+    for num in splitArr:
+        if num[0] == '[':
+            num = num[1:]
+        elif num[-1] == ']':
+            num = num[:-1]
+        if len(num) > 1:
+            vecList.append((float)(num))
+    return np.array(vecList)
+
+# Function looks at the dataframe and returns matrix of description encodings for all samples such that X.shape = (n_x, m)
+def getProductEncodingsAndPrices(df):
+    X = []
+    Y = []
+    numBuckets = 12
+    for i in range(0, len(df['word2vec'])):
+        X.append(readInArray(df['word2vec'][i]))
+        Y.append(OneHot(int(df['price-bucket'][i]), numBuckets))
+    Y= np.array(Y).T
+    X = np.array(X).T
+    return X, Y
+
+def OneHot(bucket, numBuckets):
+    arr = np.zeros(numBuckets)
+    arr[bucket] = 1
+    return arr
 
 def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     """
@@ -76,40 +105,8 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     
     return mini_batches
 
-# Function looks at the dataframe and returns matrix of description encodings for all samples such that X.shape = (n_x, m)
-def getProductEncodingsAndPrices(df):
-    X = []
-    Y = []
-    numBuckets = 12
-    for i in range(0, len(df['word2vec'])):
-        X.append(readInArray(df['word2vec'][i]))
-        print ('Word2vec representation: ', X[i])
-        print ('Bag of words representation: ', df['encodings'][i])
-        time.sleep(10)
-        Y.append(OneHot(int(df['price-bucket'][i]), numBuckets))
-    Y= np.array(Y).T
-    X = np.array(X).T
-    return X, Y
-
-def readInArray(word2vecList):
-    word2vecList = str(word2vecList)
-    List = []
-    splitArr = word2vecList.split()
-    print(splitArr)
-    for num in re.split(' |; |, |[|]|\*|\n|\r\n|\r',word2vecList):
-       if num[0:1] != ' [' and num[len(num) - 2:] != '] ':
-            print num
-            List.append((float)(num))
-    return np.array(List)
-
-
-def OneHot(bucket, numBuckets):
-    arr = np.zeros(numBuckets)
-    arr[bucket] = 1
-    return arr
-
 def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
-          num_epochs = 1500, minibatch_size = 128, print_cost = True):
+          num_epochs = 100, minibatch_size = 128, print_cost = True):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
     Arguments:
@@ -128,7 +125,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
     ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
     tf.set_random_seed(1)                             # to keep consistent results
     seed = 3                                          # to keep consistent results
-    (n_x, m) =  X_train.shape[0], X_train.shape[1]                       # (n_x: input size, m : number of examples in the train set)
+    (n_x, m) =  X_train.shape[0], X_train.shape[1]    # (n_x: input size, m : number of examples in the train set)
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
 

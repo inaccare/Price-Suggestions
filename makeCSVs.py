@@ -34,10 +34,7 @@ def main():
 	if len(sys.argv) != 5:
 		raise Exception("usage: python extractPDs.py <infile>.tsv <train>.csv <dev>.tsv <test>.tsv")
 	tsvFilename, trainCSV, devCSV, testCSV = sys.argv[1:5]
-	if tsvFilename == 'master.tsv':
-		extractPDs(tsvFilename, trainCSV, devCSV, testCSV)
-	else:
-		print('Off by 1 error')
+	extractPDs(tsvFilename, trainCSV, devCSV, testCSV)
 
 if __name__ == '__main__':
 	main()

@@ -9,6 +9,7 @@ import h5py
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.python.framework import ops
+import json
 # import tensorflow_utils
 # from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
@@ -22,17 +23,16 @@ def main():
     if (len(sys.argv) >=2):
         trainCSV = sys.argv[1]
     if (len(sys.argv) == 3):
-        testCSV = sys.argv[2]
-    trainDF = pd.read_csv(trainCSV, header = 0)
-    trainDF = trainDF.truncate(before = 0, after = 100)  # Using this for now so it runs. Take out when training all of them
+        devCSV = sys.argv[2]
+    trainDF = pd.read_csv(trainCSV, header = 0) # Using this for now so it runs. Take out when training all of them
     X_train, Y_train = getProductEncodingsAndPrices(trainDF)
-    # print ("number of training examples = " + str(X_train.shape[1]))
-    # print ("number of test examples = " + str(X_test.shape[1]))
+    devDF = pd.read_csv(devCSV, header = 0)
+    X_dev, Y_dev = getProductEncodingsAndPrices(devDF)
     print ("X_train shape: " + str(len(X_train)))
     print ("Y_train shape: " + str(Y_train.shape))
-    # print ("X_test shape: " + str(X_test.shape))
-    # print ("Y_test shape: " + str(Y_test.shape))
-    parameters = model(X_train, Y_train)#, X_test, Y_test)
+    print ("X_dev shape: " + str(X_dev.shape))
+    print ("Y_dev shape: " + str(Y_dev.shape))
+    parameters = model(X_train, Y_train, X_dev, Y_dev, num_epochs = 1)
 
 def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     """
@@ -75,7 +75,7 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
 
 def expandMinibatchArrays(minibatch_X):
     X = []
-    vocabLength = 517153  #Look at vocab-length for this value. Everytime bag_of_words is run, this file is written to.
+    vocabLength = 517430  #Look at vocab-length for this value. Everytime bag_of_words is run, this file is written to.
     for sample in minibatch_X:
         X.append(expandArray(sample, vocabLength))
     return np.array(X).T
@@ -106,11 +106,10 @@ def expandArray(List, vocabLength):
             arr[(int)(i)] = 1
     return arr
 
-def model(X_train, Y_train, learning_rate = 0.0001,
-          num_epochs = 100, minibatch_size = 32, print_cost = True):
+def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
+          num_epochs = 1500, minibatch_size = 32, print_cost = True):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
-
     Arguments:
     X_train -- training set, of shape (input size = 12288, number of training examples = 1080)
     Y_train -- test set, of shape (output size = 6, number of training examples = 1080)
@@ -120,7 +119,6 @@ def model(X_train, Y_train, learning_rate = 0.0001,
     num_epochs -- number of epochs of the optimization loop
     minibatch_size -- size of a minibatch
     print_cost -- True to print the cost every 100 epochs
-
     Returns:
     parameters -- parameters learnt by the model. They can then be used to predict.
     """
@@ -128,7 +126,7 @@ def model(X_train, Y_train, learning_rate = 0.0001,
     ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
     tf.set_random_seed(1)                             # to keep consistent results
     seed = 3                                          # to keep consistent results
-    (n_x, m) =  517153, len(X_train)                        # (n_x: input size, m : number of examples in the train set)
+    (n_x, m) =  517430, len(X_train)                        # (n_x: input size, m : number of examples in the train set)
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
 
@@ -168,7 +166,7 @@ def model(X_train, Y_train, learning_rate = 0.0001,
 
         # Do the training loop
         for epoch in range(num_epochs):
-
+            t0 = time.time()
             epoch_cost = 0.                       # Defines a cost related to an epoch
             num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
             seed = seed + 1
@@ -187,6 +185,8 @@ def model(X_train, Y_train, learning_rate = 0.0001,
                 ### END CODE HERE ###
 
                 epoch_cost += minibatch_cost / num_minibatches
+            t1 = time.time()
+            print 'Time for one epoch = ' + str(t1 - t0)
 
             # Print the cost every epoch
             if print_cost == True and epoch % 10 == 0:
@@ -194,44 +194,52 @@ def model(X_train, Y_train, learning_rate = 0.0001,
             if print_cost == True and epoch % 5 == 0:
                 costs.append(epoch_cost)
 
-        # plot the cost
-        plt.plot(np.squeeze(costs))
-        plt.ylabel('cost')
-        plt.xlabel('iterations (per tens)')
-        plt.title("Learning rate =" + str(learning_rate))
-        plt.show()
 
         # lets save the parameters in a variable
         parameters = sess.run(parameters)
-        for val in parameters:
-            parameters[val] = parameters[val].tolist()
-        fileout = open('parameters.json', 'w')
-        json.dump(parameters, fileout)
         print ("Parameters have been trained!")
 
         # Calculate the correct predictions
         correct_prediction = tf.equal(tf.argmax(Z2), tf.argmax(Y))
 
         # Calculate accuracy on the test set
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+        accuracy = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 
-        print ("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train}))
-        # print ("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test}))
-
+        minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
+        overallRight = 0
+        for minibatch in minibatches:
+            (minibatch_X, minibatch_Y) = minibatch
+            minibatch_X = expandMinibatchArrays(minibatch_X)
+            overallRight = overallRight + accuracy.eval({X: minibatch_X, Y: minibatch_Y})
+        print 'Train accuracy = ', str(overallRight/m)
+        minibatches = random_mini_batches(X_dev, Y_dev, minibatch_size, seed)
+        overallRight = 0
+        for minibatch in minibatches:
+            (minibatch_X, minibatch_Y) = minibatch
+            minibatch_X = expandMinibatchArrays(minibatch_X)
+            overallRight = overallRight + accuracy.eval({X: minibatch_X, Y: minibatch_Y})
+        print 'Dev accuracy = ', str(overallRight/len(X_dev))
+        for val in parameters:
+            parameters[val] = parameters[val].tolist()
+        fileout = open('parameters.json', 'w')
+        json.dump(parameters, fileout)
+        # plot the cost
+        plt.plot(np.squeeze(costs))
+        plt.ylabel('cost')
+        plt.xlabel('iterations (per tens)')
+        plt.title("Learning rate =" + str(learning_rate))
+        plt.show()
         return parameters
 
 def create_placeholders(n_x, n_y):
     """
     Creates the placeholders for the tensorflow session.
-
     Arguments:
     n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
     n_y -- scalar, number of classes (from 0 to 5, so -> 6)
-
     Returns:
     X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
     Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float"
-
     Tips:
     - You will use None because it let's us be flexible on the number of examples you will for the placeholders.
       In fact, the number of examples during test/train is different.
@@ -253,7 +261,6 @@ def initialize_parameters(n_x, m, n_y):
                         b2 : [12, 1]
                         W3 : [6, 12]
                         b3 : [6, 1]
-
     Returns:
     parameters -- a dictionary of tensors containing W1, b1, W2, b2, W3, b3
     """
@@ -263,8 +270,8 @@ def initialize_parameters(n_x, m, n_y):
     ### START CODE HERE ### (approx. 6 lines of code)
     W1 = tf.get_variable("W1", [25,n_x], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
     b1 = tf.get_variable("b1", [25, 1], initializer= tf.zeros_initializer())
-    W2 = tf.get_variable("W2", [12, 25], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
-    b2 = tf.get_variable("b2", [12, 1], initializer = tf.zeros_initializer())
+    W2 = tf.get_variable("W2", [n_y, 25], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+    b2 = tf.get_variable("b2", [n_y, 1], initializer = tf.zeros_initializer())
     #W3 = tf.get_variable("W3", [12, 12], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
     #b3 = tf.get_variable("b3", [12, 1], initializer = tf.zeros_initializer())
     ### END CODE HERE ###
@@ -281,12 +288,10 @@ def initialize_parameters(n_x, m, n_y):
 def forward_propagation(X, parameters):
     """
     Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
-
     Arguments:
     X -- input dataset placeholder, of shape (input size, number of examples)
     parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3"
                   the shapes are given in initialize_parameters
-
     Returns:
     Z3 -- the output of the last LINEAR unit
     """
@@ -313,11 +318,9 @@ def forward_propagation(X, parameters):
 def compute_cost(Z2, Y):
     """
     Computes the cost
-
     Arguments:
     Z2 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
     Y -- "true" labels vector placeholder, same shape as Z2
-
     Returns:
     cost - Tensor of the cost function
     """

@@ -50,9 +50,10 @@ def main():
             dev_encodings.append(create_document_vector(sentenceToArr(dev_descriptions[i].lower()), vocabulary))
         else:
             print 'At iteration ', i, ' of dev set, no product description was available'
+            dev_encodings.append(np.array([]))
     print 'Dev product descriptions encoded...'
     devdf['encodings'] = pd.Series(dev_encodings, index = devdf.index)
-    devdf.to_csv('dev_enc.csv', header = 0)
+    devdf.to_csv('dev_enc.csv', index = False)
     print 'Dev encodings written to csv ...'
     print 'Starting encoding for test set...'
     test_descriptions = testdf['item_description'].as_matrix()
@@ -63,9 +64,10 @@ def main():
             test_encodings.append(create_document_vector(sentenceToArr(test_descriptions[i].lower()), vocabulary))
         else:
             print 'At iteration ', i, ' of test set, no product description was available'
+            test_encodings.append(np.array([]))
     print 'Test product descriptions encoded...'
     testdf['encodings'] = pd.Series(test_encodings, index = testdf.index)
-    testdf.to_csv('test_enc.csv', header = 0)
+    testdf.to_csv('test_enc.csv', index = False)
     print 'Test encodings written to csv ...'
 
 def writeVocabLengthToFile(vocabLength):

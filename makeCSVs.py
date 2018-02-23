@@ -30,6 +30,7 @@ def getBucket(price):
 	return int(len(cutoffs) - 1)
 
 def main():
+	np.random.seed(seed=1)
 	if len(sys.argv) != 5:
 		raise Exception("usage: python extractPDs.py <infile>.tsv <train>.csv <dev>.tsv <test>.tsv")
 	tsvFilename, trainCSV, devCSV, testCSV = sys.argv[1:5]

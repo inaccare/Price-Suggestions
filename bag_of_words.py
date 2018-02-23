@@ -6,9 +6,11 @@ import sys
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise Exception("usage: python bag_of_words.py train.csv")
+    if len(sys.argv) != 4:
+        raise Exception("usage: python bag_of_words.py train.csv dev.csv test.csv")
     inputfile = sys.argv[1]
+    devfile = sys.argv[2]
+    testfile = sys.argv[3]
     df = pd.read_csv(inputfile, header = 0)
     descriptions = df['item_description'].as_matrix()
     count = 0
@@ -18,10 +20,11 @@ def main():
     for i in range (0, masterLength):
         if (pd.isnull(descriptions[i]) == False):
             vocabulary, count = build_vocabulary(descriptions[i].lower(), count, vocabulary)
+    vocabulary['UNK'] = count
     writeVocabLengthToFile(len(vocabulary))
     encodings = []
     j = 0
-    for i in range (0, len(descriptions)):
+    for i in range (0, masterLength):
         if j!=7:
             if i == lengths[j]:
                 print "Currently ", j+1, "/8 of the way through encoding"
@@ -31,9 +34,39 @@ def main():
         else:
             print "At iteration ", i, ", no product description was available"
             encodings.append(np.array([]))
+    print 'Training product descriptions encoded...'
     df['encodings'] = pd.Series(encodings, index = df.index)
-    # print df['encodings']
     df.to_csv('train_enc.csv', index = False)
+    print 'Training encodings written to csv ...'
+    print 'Reading in dev and test sets into dataframe ...'
+    devdf = pd.read_csv(devfile, header = 0)
+    testdf = pd.read_csv(testfile, header = 0)
+    print 'Starting encoding for dev set...'
+    dev_descriptions = devdf['item_description'].as_matrix()
+    devLength = len(dev_descriptions)
+    dev_encodings = []
+    for i in range (devLength):
+        if (pd.isnull(dev_descriptions[i]) == False):
+            dev_encodings.append(create_document_vector(sentenceToArr(dev_descriptions[i].lower()), vocabulary))
+        else:
+            print 'At iteration ', i, ' of dev set, no product description was available'
+    print 'Dev product descriptions encoded...'
+    devdf['encodings'] = pd.Series(dev_encodings, index = devdf.index)
+    devdf.to_csv('dev_enc.csv', header = 0)
+    print 'Dev encodings written to csv ...'
+    print 'Starting encoding for test set...'
+    test_descriptions = testdf['item_description'].as_matrix()
+    testLength = len(test_descriptions)
+    test_encodings = []
+    for i in range (testLength):
+        if (pd.isnull(test_descriptions[i]) == False):
+            test_encodings.append(create_document_vector(sentenceToArr(test_descriptions[i].lower()), vocabulary))
+        else:
+            print 'At iteration ', i, ' of test set, no product description was available'
+    print 'Test product descriptions encoded...'
+    testdf['encodings'] = pd.Series(test_encodings, index = testdf.index)
+    testdf.to_csv('test_enc.csv', header = 0)
+    print 'Test encodings written to csv ...'
 
 def writeVocabLengthToFile(vocabLength):
     fp = open('vocab-length.txt', 'w')
@@ -48,8 +81,8 @@ def build_vocabulary(sentence, Count, vocabulary):
         if word in vocabulary:
             count = count
         else:
-            count = count + 1
             vocabulary[word] = count
+            count = count + 1
     return vocabulary, count
 
 def sentenceToArr(sentence):
@@ -67,7 +100,9 @@ def create_document_vector(description, vocabulary):
     for word, count in word_count.iteritems():
         if word in vocabulary:
             index =  vocabulary[word]
-            encode.append(index-1)
+            encode.append(index)
+        else:
+            encode.append(vocabulary['UNK'])
     return np.array(encode)
 
 

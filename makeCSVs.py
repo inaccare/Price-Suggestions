@@ -11,7 +11,7 @@ def extractPDs(inputfile, train, dev, test):
 	df['price-bucket'] = pd.Series(np.zeros(masterLength), index = df.index)
 	for i in range (0, masterLength):
 		df.at[i, 'price-bucket'] = getBucket(df['price'][i])
-	df = df.sample(frac=1).reset_index(drop=True)
+	df = df.sample(frac=1, random_state=1).reset_index(drop=True)
 	traindf = df.truncate(before = 0, after= 1452884)
 	devdf = df.truncate(before = 1452885, after= 1467709)
 	testdf = df.truncate(before = 1467710, after = 1482534)

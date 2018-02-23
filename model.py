@@ -9,6 +9,7 @@ import h5py
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.python.framework import ops
+import codecs, json
 # import tensorflow_utils
 # from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
@@ -32,7 +33,7 @@ def main():
     print ("Y_train shape: " + str(Y_train.shape))
     # print ("X_test shape: " + str(X_test.shape))
     # print ("Y_test shape: " + str(Y_test.shape))
-    parameters = model(X_train, Y_train)#, X_test, Y_test)
+    parameters = model(X_train, Y_train, num_epochs = 101)#, X_test, Y_test)
 
 def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     """
@@ -196,26 +197,35 @@ def model(X_train, Y_train, learning_rate = 0.0001,
                 costs.append(epoch_cost)
 
         # plot the cost
-        plt.plot(np.squeeze(costs))
-        plt.ylabel('cost')
-        plt.xlabel('iterations (per tens)')
-        plt.title("Learning rate =" + str(learning_rate))
-        plt.show()
+        # plt.plot(np.squeeze(costs))
+        # plt.ylabel('cost')
+        # plt.xlabel('iterations (per tens)')
+        # plt.title("Learning rate =" + str(learning_rate))
+        # plt.show()
 
         # lets save the parameters in a variable
         parameters = sess.run(parameters)
+        for val in parameters:
+            parameters[val] = parameters[val].tolist()
+        fileout = open('parameters.json', 'w')
+        json.dump(parameters, fileout)
         print ("Parameters have been trained!")
-
+    
         # Calculate the correct predictions
         correct_prediction = tf.equal(tf.argmax(Z3), tf.argmax(Y))
 
         # Calculate accuracy on the test set
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+        # accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        print ("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train}))
+        # print ("Train Accuracy:", evalAccuracy(X_train,Y_train, parameters))
         # print ("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test}))
 
         return parameters
+
+# def evalAccuracy(X_train, Y_train, parameters):
+#     numWrong = 0
+#     for i in range(len(X_train)):
+#         y_hat = 
 
 def create_placeholders(n_x, n_y):
     """

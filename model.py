@@ -107,7 +107,7 @@ def expandArray(List, vocabLength):
     return arr
 
 def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
-          num_epochs = 1500, minibatch_size = 32, print_cost = True):
+          num_epochs = 1500, minibatch_size = 128, print_cost = True):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
     Arguments:
@@ -166,14 +166,11 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
 
         # Do the training loop
         for epoch in range(num_epochs):
-            t0 = time.time()
             epoch_cost = 0.                       # Defines a cost related to an epoch
             num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
             seed = seed + 1
             minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
-
             for minibatch in minibatches:
-
                 # Select a minibatch
                 (minibatch_X, minibatch_Y) = minibatch
 
@@ -185,8 +182,6 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
                 ### END CODE HERE ###
 
                 epoch_cost += minibatch_cost / num_minibatches
-            t1 = time.time()
-            print 'Time for one epoch = ' + str(t1 - t0)
 
             # Print the cost every epoch
             if print_cost == True and epoch % 10 == 0:
@@ -224,11 +219,11 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
         fileout = open('parameters.json', 'w')
         json.dump(parameters, fileout)
         # plot the cost
-        plt.plot(np.squeeze(costs))
-        plt.ylabel('cost')
-        plt.xlabel('iterations (per tens)')
-        plt.title("Learning rate =" + str(learning_rate))
-        plt.show()
+        # plt.plot(np.squeeze(costs))
+        # plt.ylabel('cost')
+        # plt.xlabel('iterations (per tens)')
+        # plt.title("Learning rate =" + str(learning_rate))
+        # plt.show()
         return parameters
 
 def create_placeholders(n_x, n_y):

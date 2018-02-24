@@ -14,7 +14,7 @@ import json
 from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
 def main():
-    # Usage is as follows: python model.py <train_enc>.csv <test_enc>.csv(optional)
+    # Usage is as follows: python model.py <train_enc>.csv <dev_enc>.csv(optional)
     # Test variables are dummy variables for now
     X_test = []
     Y_test = []
@@ -37,6 +37,9 @@ def main():
     parameters = model(X_train, Y_train, X_dev, Y_dev, num_epochs = 300)
 
 def readInArray(word2vecList):
+    """
+    Reads in the word2vec vector for a given item and returns it in the proper format
+    """
     word2vecList = str(word2vecList)
     vecList = []
     splitArr = word2vecList.split()
@@ -49,6 +52,11 @@ def readInArray(word2vecList):
             vecList.append((float)(num))
     return np.array(vecList)
 
+def OneHot(bucket, numBuckets):
+    arr = np.zeros(numBuckets)
+    arr[bucket] = 1
+    return arr
+
 # Function looks at the dataframe and returns matrix of description encodings for all samples such that X.shape = (n_x, m)
 def getProductEncodingsAndPrices(df):
     X = []
@@ -60,11 +68,6 @@ def getProductEncodingsAndPrices(df):
     Y= np.array(Y).T
     X = np.array(X).T
     return X, Y
-
-def OneHot(bucket, numBuckets):
-    arr = np.zeros(numBuckets)
-    arr[bucket] = 1
-    return arr
 
 def random_mini_batches_bagOfWords(X, Y, mini_batch_size = 64, seed = 0):
     """
@@ -173,13 +176,12 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
 
         # Calculate the correct predictions
         correct_prediction = tf.equal(tf.argmax(Z2), tf.argmax(Y))
-
-        # Calculate accuracy on the test set
+        # Calculate accuracy on the train set
         accuracy = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 
         Accuracy = (accuracy.eval({X: X_train, Y: Y_train}))/m
         print ('Train accuracy is ' + str(Accuracy))
-        Accuracy = (accuracy.eval({X: minibatch_X, Y: minibatch_Y}))/(X_dev.shape[0])
+        Accuracy = (accuracy.eval({X: X_dev, Y: Y_dev}))/(X_dev.shape[1])
         print ('Dev accuracy is ' + str(Accuracy))
         for val in parameters:
             parameters[val] = parameters[val].tolist()

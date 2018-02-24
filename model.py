@@ -12,7 +12,7 @@ import json
 
 
 def main():
-    # Usage is as follows: python model.py <train_enc>.csv <test_enc>.csv(optional)
+    # Usage is as follows: python model.py <train_enc>.csv <dev_enc>.csv
 
     X_test = []
     Y_test = []
@@ -38,9 +38,9 @@ def random_mini_batches(X, Y, mini_batch_size = 128, seed = 0):
 
     Arguments:
     X -- input data, of shape (input size, number of examples)
-    Y -- true "label" vector (containing 0 if cat, 1 if non-cat), of shape (1, number of examples)
+    Y -- true "label" vector of shape (numbuckets, number of examples)
     mini_batch_size - size of the mini-batches, integer
-    seed -- this is only for the purpose of grading, so that you're "random minibatches are the same as ours.
+    seed -- so that everyone in our group will get same minibatches permutations
 
     Returns:
     mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
@@ -90,7 +90,9 @@ def expandMinibatchArrays(minibatch_X):
 def getProductEncodingsAndPrices(df):
     """
     Function looks at the dataframe and returns matrix of description
-    encodings for all samples such that X.shape = (n_x, m)
+    condensed encodings for all samples (each sample has variable length vectors
+        of indices corresponding to vocab indices of words that appear in each
+        description)
 
     Arguments:
     df -- dataframe of data
@@ -143,12 +145,12 @@ def expandArray(List, vocabLength):
 def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
           num_epochs = 1500, minibatch_size = 128, print_cost = True):
     """
-    Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
+    Implements a two-layer tensorflow neural network: LINEAR->RELU->LINEAR->SOFTMAX.
     Arguments:
-    X_train -- training set, of shape (input size = 12288, number of training examples = 1080)
-    Y_train -- test set, of shape (output size = 6, number of training examples = 1080)
-    X_test -- training set, of shape (input size = 12288, number of training examples = 120)
-    Y_test -- test set, of shape (output size = 6, number of test examples = 120)
+    X_train -- training set, of shape (input size = vocab_length, number of training examples = 1452885)
+    Y_train -- test set, of shape (output size = 12, number of training examples = 1452885)
+    X_test -- training set, of shape (input size = vocab_length, number of test examples)
+    Y_test -- test set, of shape (output size = 12, number of test examples)
     learning_rate -- learning rate of the optimization
     num_epochs -- number of epochs of the optimization loop
     minibatch_size -- size of a minibatch
@@ -200,6 +202,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
 
                 # The line that runs the graph on a minibatch.
                 # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
+                # Turns index array of variable length to one-hot array of length vocab-length
                 minibatch_X = expandMinibatchArrays(minibatch_X)
                 _ , minibatch_cost = sess.run([optimizer, cost], feed_dict = {X:minibatch_X, Y:minibatch_Y})
 
@@ -219,9 +222,8 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
         # Calculate the correct predictions
         correct_prediction = tf.equal(tf.argmax(Z2), tf.argmax(Y))
 
-        # Calculate accuracy on the test set
+        # Calculate accuracy on the train set
         accuracy = tf.reduce_sum(tf.cast(correct_prediction, "float"))
-
         minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
         overallRight = 0
         for minibatch in minibatches:
@@ -229,6 +231,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
             minibatch_X = expandMinibatchArrays(minibatch_X)
             overallRight = overallRight + accuracy.eval({X: minibatch_X, Y: minibatch_Y})
         print 'Train accuracy = ', str(overallRight/m)
+        # Calculate accuracy on the dev set
         minibatches = random_mini_batches(X_dev, Y_dev, minibatch_size, seed)
         overallRight = 0
         for minibatch in minibatches:
@@ -236,6 +239,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
             minibatch_X = expandMinibatchArrays(minibatch_X)
             overallRight = overallRight + accuracy.eval({X: minibatch_X, Y: minibatch_Y})
         print 'Dev accuracy = ', str(overallRight/len(X_dev))
+        # Writing out trained parameters onto an uotput file called parameters.json
         for val in parameters:
             parameters[val] = parameters[val].tolist()
         fileout = open('parameters.json', 'w')
@@ -252,7 +256,7 @@ def create_placeholders(n_x, n_y):
     """
     Creates the placeholders for the tensorflow session.
     Arguments:
-    n_x -- scalar, size of an image vector
+    n_x -- scalar, size of vocab
     n_y -- scalar, number of classes
     Returns:
     X -- placeholder for the data input, of shape [n_x, None] and dtype "float"

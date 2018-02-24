@@ -17,11 +17,14 @@ def main():
     vocabulary = dict()
     masterLength = len(descriptions)
     lengths = [int(masterLength/8), int(masterLength/4), int(3*masterLength/8), int(masterLength/2),int(5*masterLength/8), int(3*masterLength/4), int(7*masterLength/8)]
+    # Building the vocabulary to use for encoding the sentences
     for i in range (0, masterLength):
         if (pd.isnull(descriptions[i]) == False):
             vocabulary, count = build_vocabulary(descriptions[i].lower(), count, vocabulary)
     vocabulary['UNK'] = count
+    # Writes length of vocabulary to an output file so that this can be used in the model
     writeVocabLengthToFile(len(vocabulary))
+    # Rest of main encodes training, dev and test sets using vocabulary derived from train set
     encodings = []
     j = 0
     for i in range (0, masterLength):
@@ -105,11 +108,11 @@ def build_vocabulary(sentence, Count, vocabulary):
 
 def sentenceToArr(sentence):
     """
-    Clean the sentence of punctuation
+    Splits sentence into array of words
     Arguments:
     sentence -- data file sentence 
     Returns:
-    sentence -- clean sentence
+    sentence -- array containing words in that sentence
     """
     return re.split(' |; |, |\*|\n', sentence)
 

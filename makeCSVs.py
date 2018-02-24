@@ -3,13 +3,14 @@ import pandas as pd
 import sys
 import csv
 
+# Cutoffs derived from quantile cuts from master tsv
 cutoffs = [7, 9, 10, 12, 15, 17, 20, 24, 29, 38, 56, 2009]
 
 def extractPDs(inputfile, train, dev, test):
 	"""
     	Creates train.csv, dev.csv, test.csv
       	Arguments:
-    	inputfile -- raw data file
+    	inputfile -- raw data tsv file
     	train -- file name
     	dev -- file name
     	test -- file name

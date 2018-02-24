@@ -71,12 +71,28 @@ def main():
     print 'Test encodings written to csv ...'
 
 def writeVocabLengthToFile(vocabLength):
+    """
+    Records the vocabulary length for use in model
+    Arguments:
+    vocabLength -- length of the vocabulary (corpus)
+    Returns:
+    nothing
+    """
     fp = open('vocab-length.txt', 'w')
     fp.write('Length of vocabulary is ' + str(vocabLength) +'.')
     fp.close()
 
 def build_vocabulary(sentence, Count, vocabulary):
-    # For each word in words vector put in dictionary with index
+    """
+    For each word in words vector put in dictionary with index
+    Arguments:
+    sentence -- sentence of words to be added to the vocabulary
+    Count -- track index for storing new words in the vocabulary
+    vocabulary -- dictionary of vocabulary 
+    Returns:
+    vocabulary -- updated vocabulary
+    count -- updated index count
+    """
     words= sentenceToArr(sentence)
     count = Count
     for word in words:
@@ -88,26 +104,44 @@ def build_vocabulary(sentence, Count, vocabulary):
     return vocabulary, count
 
 def sentenceToArr(sentence):
+    """
+    Clean the sentence of punctuation
+    Arguments:
+    sentence -- data file sentence 
+    Returns:
+    sentence -- clean sentence
+    """
     return re.split(' |; |, |\*|\n', sentence)
 
 def sentence_count(sentence):
-    # Count occurance of each word in sentence
+    """
+    Produce dictionary with key value pairs word and frequency respectively
+    Arguments:
+    sentence -- sentence of words in example
+    Returns:
+    word_count -- dictionary mapping words to their frequency within the sentence
+    """
     word_count = dict(Counter(sentence))
     return word_count
 
 def create_document_vector(description, vocabulary):
-    # Build vector for sentence coding, at index in vocabulary put word frequency
+    """
+    Build vector for sentence coding, at index in vocabulary put 1 (binary coding)    
+    Arguments:
+    description -- product description from example
+    vocabulary -- vocabulary for all sentences in training set
+    Returns:
+    encoding -- encoded vector with 1 in the corresponding index of the word in the vocabulary
+    """
     word_count = sentence_count(description)
     encode = []
-    for word, count in word_count.iteritems():
+    for word, count in list(word_count.items()):
         if word in vocabulary:
             index =  vocabulary[word]
             encode.append(index)
         else:
             encode.append(vocabulary['UNK'])
     return np.array(encode)
-
-
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ def main():
     if (len(sys.argv) == 3):
         devCSV = sys.argv[2]
     trainDF = pd.read_csv(trainCSV, header = 0)
-    trainDF = trainDF.truncate(before = 0, after = 100000)
+    trainDF = trainDF.truncate(before = 0, after = 5000)
     X_train, Y_train = getProductEncodingsAndPrices(trainDF)
     devDF = pd.read_csv(devCSV, header = 0)
 #    devDF = devDF.truncate(before = 0, after = 199)
@@ -50,6 +50,8 @@ def readInArray(word2vecList):
             num = num[:-1]
         if len(num) > 1:
             vecList.append((float)(num))
+    if sum(vecList) == 0:
+        return np.zeros(len(vecList))
     return np.array(vecList)
 
 def OneHot(bucket, numBuckets):
@@ -69,7 +71,7 @@ def getProductEncodingsAndPrices(df):
     X = np.array(X).T
     return X, Y
 
-def random_mini_batches_bagOfWords(X, Y, mini_batch_size = 64, seed = 0):
+def random_mini_batches_v2(X, Y, mini_batch_size = 64, seed = 0):
     """
     Creates a list of random minibatches from (X, Y)
     
@@ -82,7 +84,7 @@ def random_mini_batches_bagOfWords(X, Y, mini_batch_size = 64, seed = 0):
     Returns:
     mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
     """
-    m = len(X)                   # number of training examples
+    m = len(X)                 # number of training examples
     mini_batches = []
     np.random.seed(seed)
     
@@ -120,7 +122,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
     learning_rate -- learning rate of the optimization
     num_epochs -- number of epochs of the optimization loop
     minibatch_size -- size of a minibatch
-    print_cost -- True to print the cost every 100 epochs
+    print_cost -- True to print the cost every 10 epochs
     Returns:
     parameters -- parameters learnt by the model. They can then be used to predict.
     """

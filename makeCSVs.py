@@ -6,6 +6,16 @@ import csv
 cutoffs = [7, 9, 10, 12, 15, 17, 20, 24, 29, 38, 56, 2009]
 
 def extractPDs(inputfile, train, dev, test):
+	"""
+    	Creates train.csv, dev.csv, test.csv
+      	Arguments:
+    	inputfile -- raw data file
+    	train -- file name
+    	dev -- file name
+    	test -- file name
+    	Returns:
+    	nothing
+    	"""
 	df = pd.read_csv(inputfile, sep = '\t', header = 0)
 	masterLength = len(df['price'])
 	df['price-bucket'] = pd.Series(np.zeros(masterLength), index = df.index)
@@ -24,6 +34,14 @@ def extractPDs(inputfile, train, dev, test):
 	testdf.to_csv(test, index = False)
 
 def getBucket(price):
+	"""
+    	Takes true price and buckets it then returns the appropriate bucket
+      	Arguments:
+    	price -- single price
+    	Returns:
+	bucket -- bucket for given price
+   	
+    	"""
 	for i in range(0, len(cutoffs)):
 		if price < cutoffs[i]:
 			return int(i)

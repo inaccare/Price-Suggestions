@@ -11,7 +11,7 @@ import tensorflow as tf
 from tensorflow.python.framework import ops
 import json
 # import tensorflow_utils
-# from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
+from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
 def main():
     # Usage is as follows: python model.py <train_enc>.csv <test_enc>.csv(optional)
@@ -25,16 +25,16 @@ def main():
     if (len(sys.argv) == 3):
         devCSV = sys.argv[2]
     trainDF = pd.read_csv(trainCSV, header = 0)
-#    trainDF = trainDF.truncate(before = 0, after = 10000)
+    trainDF = trainDF.truncate(before = 0, after = 100000)
     X_train, Y_train = getProductEncodingsAndPrices(trainDF)
     devDF = pd.read_csv(devCSV, header = 0)
-#    devDF = devDF.truncate(before = 0, after = 99)
+#    devDF = devDF.truncate(before = 0, after = 199)
     X_dev, Y_dev = getProductEncodingsAndPrices(devDF)
     print ("X_train shape: " + str(X_train.shape))
     print ("Y_train shape: " + str(Y_train.shape))
     print ("X_dev shape: " + str(X_dev.shape))
     print ("Y_dev shape: " + str(Y_dev.shape))
-    parameters = model(X_train, Y_train, X_dev, Y_dev, num_epochs = 100)
+    parameters = model(X_train, Y_train, X_dev, Y_dev, num_epochs = 300)
 
 def readInArray(word2vecList):
     word2vecList = str(word2vecList)
@@ -66,7 +66,7 @@ def OneHot(bucket, numBuckets):
     arr[bucket] = 1
     return arr
 
-def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
+def random_mini_batches_bagOfWords(X, Y, mini_batch_size = 64, seed = 0):
     """
     Creates a list of random minibatches from (X, Y)
     
@@ -79,26 +79,26 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     Returns:
     mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
     """
-    m = X.shape[1]                 # number of training examples
+    m = len(X)                   # number of training examples
     mini_batches = []
     np.random.seed(seed)
     
     # Step 1: Shuffle (X, Y)
     permutation = list(np.random.permutation(m))
-    shuffled_X = X[:,permutation]
+    shuffled_X = X[permutation]
     shuffled_Y = Y[:, permutation].reshape((Y.shape[0],m))
 
     # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
     num_complete_minibatches = int(math.floor(m/mini_batch_size)) # number of mini batches of size mini_batch_size in your partitionning
     for k in range(0, num_complete_minibatches):
-        mini_batch_X = shuffled_X[:,k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch_X = shuffled_X[k * mini_batch_size : k * mini_batch_size + mini_batch_size]
         mini_batch_Y = shuffled_Y[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
         mini_batch = (mini_batch_X, mini_batch_Y)
         mini_batches.append(mini_batch)
     
     # Handling the end case (last mini-batch < mini_batch_size)
     if m % mini_batch_size != 0:
-        mini_batch_X = shuffled_X[:,num_complete_minibatches * mini_batch_size : m]
+        mini_batch_X = shuffled_X[num_complete_minibatches * mini_batch_size : m]
         mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size : m]
         mini_batch = (mini_batch_X, mini_batch_Y)
         mini_batches.append(mini_batch)
@@ -106,14 +106,14 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     return mini_batches
 
 def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
-          num_epochs = 100, minibatch_size = 128, print_cost = True):
+          num_epochs = 300, minibatch_size = 128, print_cost = True):
     """
-    Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
+    Implements a two-layer tensorflow neural network: LINEAR->RELU->LINEAR->SOFTMAX.
     Arguments:
-    X_train -- training set, of shape (input size = 12288, number of training examples = 1080)
-    Y_train -- test set, of shape (output size = 6, number of training examples = 1080)
-    X_test -- training set, of shape (input size = 12288, number of training examples = 120)
-    Y_test -- test set, of shape (output size = 6, number of test examples = 120)
+    X_train -- training set, of shape (input size = 100, number of training examples = ~1.4M)
+    Y_train -- test set, of shape (output size = 12, number of training examples = ~1.4M)
+    X_test -- training set, of shape (input size = 100, number of training examples = 14825)
+    Y_test -- test set, of shape (output size = 12, number of test examples = 14825)
     learning_rate -- learning rate of the optimization
     num_epochs -- number of epochs of the optimization loop
     minibatch_size -- size of a minibatch
@@ -125,44 +125,26 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
     ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
     tf.set_random_seed(1)                             # to keep consistent results
     seed = 3                                          # to keep consistent results
-    (n_x, m) =  X_train.shape[0], X_train.shape[1]    # (n_x: input size, m : number of examples in the train set)
+    (n_x, m) =  100, X_train.shape[1]                 # (n_x: input size, m : number of examples in the train set)
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
 
     # Create Placeholders of shape (n_x, n_y)
-    ### START CODE HERE ### (1 line)
     X, Y = create_placeholders(n_x, n_y)
-    ### END CODE HERE ###
-
     # Initialize parameters
-    ### START CODE HERE ### (1 line)
     parameters = initialize_parameters(n_x, m, n_y)
-    ### END CODE HERE ###
-
     # Forward propagation: Build the forward propagation in the tensorflow graph
-    ### START CODE HERE ### (1 line)
     Z2 = forward_propagation(X, parameters)
-    ### END CODE HERE ###
-
     # Cost function: Add cost function to tensorflow graph
-    ### START CODE HERE ### (1 line)
     cost = compute_cost(Z2, Y)
-    ### END CODE HERE ###
-
     # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer.
-    ### START CODE HERE ### (1 line)
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate).minimize(cost)
-    ### END CODE HERE ###
-
     # Initialize all the variables
     init = tf.global_variables_initializer()
-
     # Start the session to compute the tensorflow graph
     with tf.Session() as sess:
-
         # Run the initialization
         sess.run(init)
-
         # Do the training loop
         for epoch in range(num_epochs):
             epoch_cost = 0.                       # Defines a cost related to an epoch
@@ -175,9 +157,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
 
                 # IMPORTANT: The line that runs the graph on a minibatch.
                 # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
-                ### START CODE HERE ### (1 line)
                 _ , minibatch_cost = sess.run([optimizer, cost], feed_dict = {X:minibatch_X, Y:minibatch_Y})
-                ### END CODE HERE ###
 
                 epoch_cost += minibatch_cost / num_minibatches
 
@@ -186,7 +166,6 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
                 print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
             if print_cost == True and epoch % 5 == 0:
                 costs.append(epoch_cost)
-
 
         # lets save the parameters in a variable
         parameters = sess.run(parameters)
@@ -207,11 +186,11 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.0001,
         fileout = open('parameters_words2vec.json', 'w')
         json.dump(parameters, fileout)
         # plot the cost
-        # plt.plot(np.squeeze(costs))
-        # plt.ylabel('cost')
-        # plt.xlabel('iterations (per tens)')
-        # plt.title("Learning rate =" + str(learning_rate))
-        # plt.show()
+        plt.plot(np.squeeze(costs))
+        plt.ylabel('word2vec model cost')
+        plt.xlabel('iterations (per tens)')
+        plt.title("Learning rate = " + str(learning_rate))
+        plt.show()
         return parameters
 
 def create_placeholders(n_x, n_y):

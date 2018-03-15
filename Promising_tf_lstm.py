@@ -108,7 +108,7 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     Creates a list of random minibatches from (X, Y)
 
     Arguments:
-    X -- input data, of shape (input size, number of examples)
+    X -- input data, of shape (number of examples, Tx)
     Y -- true "label" vector (containing 0 if cat, 1 if non-cat), of shape (1, number of examples)
     mini_batch_size - size of the mini-batches, integer
     seed -- this is only for the purpose of grading, so that you're "random minibatches are the same as ours.
@@ -116,26 +116,26 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     Returns:
     mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
     """
-    m = len(X)                 # number of training examples
+    m = Y.shape[1]                 # number of training examples
     mini_batches = []
     np.random.seed(seed)
 
-    # Step 1: Shuffle (X, Y)
+    # Step 1: Shuffle (X, Y)    X shape: (Tx, m)   Y shape: (n_y, m)
     permutation = list(np.random.permutation(m))
-    shuffled_X = X[:,permutation]
-    shuffled_Y = Y[:, permutation].reshape((Y.shape[0],m))
+    shuffled_X = X[:, permutation]
+    shuffled_Y = Y[:, permutation].reshape((Y.shape[0],m))  # not sure why we need to reshape here
 
     # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
     num_complete_minibatches = int(math.floor(m/mini_batch_size)) # number of mini batches of size mini_batch_size in your partitionning
     for k in range(0, num_complete_minibatches):
-        mini_batch_X = shuffled_X[:,k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch_X = shuffled_X[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
         mini_batch_Y = shuffled_Y[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
         mini_batch = (mini_batch_X, mini_batch_Y)
         mini_batches.append(mini_batch)
 
     # Handling the end case (last mini-batch < mini_batch_size)
     if m % mini_batch_size != 0:
-        mini_batch_X = shuffled_X[:,num_complete_minibatches * mini_batch_size : m]
+        mini_batch_X = shuffled_X[:, num_complete_minibatches * mini_batch_size : m]
         mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size : m]
         mini_batch = (mini_batch_X, mini_batch_Y)
         mini_batches.append(mini_batch)
@@ -147,7 +147,7 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
 # ==========
 def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10000,
         batch_size = 128, display_step = 1):
-    # Shape of X: (Tx, m)??? Emmie please check this
+    # Shape of X: (m, Tx, n_x)??? Emmie please check this
     # Shape of Y: (n_y, m)
 
     # Network Parameters
@@ -231,7 +231,6 @@ def dynamicRNN(X, Tx, weights, biases, n_x):
 
     # Unstack to get a list of 'n_steps' tensors of shape (batch_size, n_input)
     X = tf.unstack(X, Tx, 1) #Unstack to be (None, 100) vectors
-    print("shape of X: ", X)
     n_hidden = 64
     # Define a lstm cell with tensorflow
     lstm_cell = tf.contrib.rnn.BasicLSTMCell(n_hidden)

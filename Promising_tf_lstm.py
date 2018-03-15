@@ -54,7 +54,7 @@ def getProductIndicesAndPrices(df):
     Y = []
     numBuckets = 12
     T_x = 412
-    for i in range(0, len(df['item_description'])):#len(df['item_description'])):
+    for i in range(0, 10000):#len(df['item_description'])):#len(df['item_description'])):
         if (pd.isnull(df['item_description'][i]) == False): # Checks for Nan descriptions
             X.append((getIndexArrForSentence(df['item_description'][i])))
         else:
@@ -122,6 +122,7 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
 
     # Step 1: Shuffle (X, Y)    X shape: (Tx, m)   Y shape: (n_y, m)
     permutation = list(np.random.permutation(m))
+    print("shape X", X.shape)
     shuffled_X = X[:, permutation]
     shuffled_Y = Y[:, permutation].reshape((Y.shape[0],m))  # not sure why we need to reshape here
 
@@ -176,11 +177,11 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 100
     pred = dynamicRNN(X, Tx, weights, biases, n_x)
 
     # Define loss and optimizer
-    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = tf.transpose(pred), labels = Y))
+    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = pred, labels = tf.transpose(Y)))
     optimizer = tf.train.GradientDescentOptimizer(learning_rate = learning_rate).minimize(cost)
 
     # Evaluate model
-    correct_pred = tf.equal(tf.argmax(tf.transpose(pred)), tf.argmax(Y)) #Argmax over columns
+    correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(tf.transpose(Y), 1)) #Argmax over columns
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
     # Initialize the variables (i.e. assign their default value)

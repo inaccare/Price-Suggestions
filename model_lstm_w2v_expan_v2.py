@@ -10,19 +10,20 @@ import tensorflow as tf
 from tensorflow.python.framework import ops
 import json
 import nltk
+import multiprocessing
+import gensim
 
 
 w2v = None
-gloveFile = sys.argv[3]
-with open(gloveFile, "rb") as lines:
-    w2v = {line.split()[0]: np.array(line.split()[1:])
-            for line in lines}
+w2vFile = sys.argv[3]
+w2v = gensim.models.word2vec.Word2Vec.load(w2vFile)
+
 wordToIndex = dict()
 indexToEmb = dict()
 count = 1
-for w in w2v:
+for w in w2v.wv.vocab:
     wordToIndex[w] = count
-    indexToEmb[count] = w2v[w]
+    indexToEmb[count] = w2v.wv[w]
     count = count + 1
 
 def main():
@@ -40,7 +41,7 @@ def main():
     if (len(sys.argv) >= 5):
         lr, ne, bs, tx = getHyperparamsFromJSON(str(sys.argv[4]))
     trainDF = pd.read_csv(trainCSV, header = 0)
-    trainDF = trainDF.truncate(before = 0, after = 3000)
+    trainDF = trainDF.truncate(before = 0, after = 30000)
     # For each entry in X_train, we have an array of length T_x with each entry
     # corresponding to an index into the word's w2v embedding
     X_train, Y_train = getProductIndicesAndPrices(trainDF, tx)
@@ -58,7 +59,7 @@ def main():
 # ==========
 #   MODEL
 # ==========
-def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10000,
+def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
         mini_batch_size = 128, Tx = 72, display_step = 1, n_hidden = 64):
     # Shape of X: (m, Tx, n_x)??? Emmie please check this
     # Shape of Y: (n_y, m)
@@ -227,8 +228,8 @@ def getIndexArrForSentence(sentence, T_x):
         # Only looking at first 72 words!
         if (count == T_x):
             break
-        if w.encode('UTF-8') in w2v:
-            arr[count] = wordToIndex[w.encode('UTF-8')]
+        if w in w2v.wv.vocab:
+            arr[count] = wordToIndex[w]
         count = count + 1
     return arr
 

@@ -98,11 +98,15 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 100
     # Initialize the variables (i.e. assign their default value)
     init = tf.global_variables_initializer()
 
+    m = Y_train.shape[1]
+    num_minibatches = int(math.floor(m/mini_batch_size))
     # Start training
     with tf.Session() as sess:
         # Run the initializer
         sess.run(init)
         for step in range(1, num_epochs + 1):
+            epoch_cost =0
+            tot_num_correct = 0
             # extract each miniminibatch_X, miniBatch_Y at each
             #make minimatches here (randomly shuffling across m)
             minibatches = random_mini_batches(X_train, Y_train, mini_batch_size = mini_batch_size, seed = 0)
@@ -112,14 +116,16 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 100
                 minibatch_X = miniBatchIndicesToEmbedding(minibatch_X, Tx)
                 # print ("Shape of minibatch_X is " + str(minibatch_X.shape))
                 sess.run(optimizer, feed_dict={X: minibatch_X, Y: minibatch_Y})
+                mini_num_correct, loss = sess.run([num_correct, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
+                epoch_cost = epoch_cost + loss
+                tot_num_correct = tot_num_correct + mini_num_correct
                                                # Tx: Tx})
             if step % display_step == 0 or step == 1:
                 # Calculate batch accuracy & loss
-                tot_num_correct, loss = sess.run([num_correct, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
                                                     #Tx: Tx})
-                print("Step " + str(step*mini_batch_size) + ", Minibatch Loss= " + \
-                      "{:.6f}".format(loss) + ", Training Accuracy= " + \
-                      "{:.5f}".format(float(tot_num_correct/minibatch_X.shape[0])))
+                print("Epoch " + str(step) + ", Cost= " + \
+                      "{:.6f}".format(epoch_cost/num_minibatches) + ", Training Accuracy= " + \
+                      "{:.5f}".format(float(tot_num_correct/m)))
 
         print("Optimization Finished!")
         train_num_correct = 0

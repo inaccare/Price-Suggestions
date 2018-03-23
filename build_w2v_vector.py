@@ -8,6 +8,13 @@ import codecs
 import multiprocessing
 import gensim
 
+"""
+This python script trains a w2v encoding scheme based on the corpus of our
+product descriptions. Outputs necessary files to compute w2v in various
+models.
+"""
+
+
 def clean_and_split_str(string):
     strip_special_chars = re.compile("[^A-Za-z]+")
     string = re.sub(strip_special_chars, " ", string)

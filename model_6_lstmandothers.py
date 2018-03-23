@@ -13,6 +13,16 @@ import nltk
 import multiprocessing
 import gensim
 
+
+"""
+This model's architecture is as follows: product descriptions goes into an LSTM cell where each
+word's w2v encoding is used as an input for each time step of the lstm. This is done for the first
+T_x words of each description. Output of last lstm timestep then gets concatenated with encodings of
+other inputs (one-hot brand vector, one-hot condition vector and multi-hot categories) before being fed 
+into a softmax output layer. Output is softmax vector of length 20, for 20 disttinct price buckets.
+W2v encodings trained on our corpus is used.
+"""
+
 num_categories_indices, num_brands_indices = 949, 4779
 len_cat_vecs, len_brand_vecs = 950, 4780
 len_cond_vecs = 6

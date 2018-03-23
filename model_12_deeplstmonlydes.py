@@ -16,6 +16,13 @@ import gensim
 # num_categories_indices, num_brands_indices = 949, 4779
 # len_cat_vecs, len_brand_vecs = 950, 4780
 # len_cond_vecs = 6
+
+"""
+This model's architecture is as follows: product descriptions go into an LSTM layer, output of LSTM goes
+through a 6-layer FC network. Output is a softmax vector of length 20, corresponding to 20 distinct 
+price buckets.
+"""
+
 w2v = None
 w2vFile = sys.argv[3]
 w2v = gensim.models.word2vec.Word2Vec.load(w2vFile)

@@ -13,19 +13,21 @@ import nltk
 import multiprocessing
 import gensim
 
-# num_categories_indices, num_brands_indices = 949, 4779
-# len_cat_vecs, len_brand_vecs = 950, 4780
-# len_cond_vecs = 6
-
 """
 This model's architecture is as follows: product descriptions go into an LSTM layer, output of LSTM goes
-through a 6-layer FC network. Output is a scalar value (for each sample) corresponding to predicted price
-based on a linear output layer.
+through a 3-layer FC network. Other inputs (brand, categories and condition) get converted into one-hot
+(in the case of brand and condition inputs) or multi-hot vectors (the case for categories). These other
+inputs then get concatenated with output of forementioned 3-layer FC and get put through a 3-layer FC network.
+Output is a scalar for each sample, corresponding to predicted price.
 """
 
+num_categories_indices, num_brands_indices = 949, 4779
+len_cat_vecs, len_brand_vecs = 950, 4780
+len_cond_vecs = 6
 w2v = None
 w2vFile = sys.argv[3]
 w2v = gensim.models.word2vec.Word2Vec.load(w2vFile)
+
 wordToIndex = dict()
 indexToEmb = dict()
 count = 1
@@ -50,24 +52,28 @@ def main():
         lr, ne, bs, tx = getHyperparamsFromJSON(str(sys.argv[4]))
     trainDF = pd.read_csv(trainCSV, header = 0)
     trainDF = trainDF.truncate(before = 0, after = 299999)
+    trainCategories, trainBrands = getOtherArrs(trainDF)
+    trainConditions = getConditions(trainDF)
     # For each entry in X_train, we have an array of length T_x with each entry
     # corresponding to an index into the word's w2v embedding
     X_train, Y_train = getProductIndicesAndPrices(trainDF, tx)
     devDF = pd.read_csv(devCSV, header = 0)
+    devCategories, devBrands = getOtherArrs(devDF)
+    devConditions = getConditions(devDF)
     X_dev, Y_dev = getProductIndicesAndPrices(devDF, tx)
     print ("X_train shape: " + str(X_train.shape))
     print ("Y_train shape: " + str(Y_train.shape))
     print ("X_dev shape: " + str(X_dev.shape))
     print ("Y_dev shape: " + str(Y_dev.shape))
     if (lr == None):
-        model(X_train, Y_train, X_dev, Y_dev)
+        model(X_train, Y_train, trainCategories, trainBrands, trainConditions, X_dev, Y_dev, devCategories, devBrands, devConditions)
     else:
-        model(X_train, Y_train, X_dev, Y_dev, learning_rate = lr, num_epochs = ne, mini_batch_size = bs, Tx = tx)
+        model(X_train, Y_train, trainCategories, trainBrands, trainConditions, X_dev, Y_dev, devCategories, devBrands, devConditions, learning_rate = lr, num_epochs = ne, mini_batch_size = bs, Tx = tx)
 
 # ==========
 #   MODEL
 # ==========
-def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
+def model(X_train, Y_train, trainCategories, trainBrands, trainConditions, X_dev, Y_dev, devCategories, devBrands, devConditions, learning_rate = 0.01, num_epochs = 10,
         mini_batch_size = 128, Tx = 72, display_step = 1, n_hidden = 64):
     # Shape of X: (m, Tx, n_x)??? Emmie please check this
     # Shape of Y: (n_y, m)
@@ -81,6 +87,9 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
     # tf Graph input
     X = tf.placeholder("float", [None, Tx, n_x])
     Y = tf.placeholder("float", [None, n_y])
+    Cats = tf.placeholder("int32", [None, len_cat_vecs])
+    Brands = tf.placeholder("int32", [None, len_brand_vecs])
+    Conds = tf.placeholder("int32", [None,len_cond_vecs])
     # A placeholder for indicating each sequence length
     #Tx = tf.placeholder(tf.int32, [None])
 
@@ -90,7 +99,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
         'W_1' : tf.get_variable('W_1',[n_hidden,n_hidden], initializer = tf.contrib.layers.xavier_initializer(seed = 1)),
         'W_2' : tf.get_variable('W_2',[n_hidden,n_hidden], initializer = tf.contrib.layers.xavier_initializer(seed = 1)),
         'W_out' : tf.get_variable('W_out',[n_hidden, n_hidden], initializer = tf.contrib.layers.xavier_initializer(seed = 1)),
-        'W_f1' : tf.get_variable('W_f1',[n_hidden, n_hidden], initializer = tf.contrib.layers.xavier_initializer(seed = 1)),
+        'W_f1' : tf.get_variable('W_f1',[n_hidden + len_cat_vecs + len_brand_vecs + len_cond_vecs ,n_hidden], initializer = tf.contrib.layers.xavier_initializer(seed = 1)),
         'W_f2' : tf.get_variable('W_f2',[n_hidden,n_hidden], initializer = tf.contrib.layers.xavier_initializer(seed = 1)),
         'W_fout' : tf.get_variable('W_fout',[n_hidden,n_y], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
     }
@@ -104,24 +113,25 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
         'b_fout' : tf.get_variable('b_fout',[n_y], initializer = tf.zeros_initializer())
     }
 
-    pred = dynamicRNN(X,Tx, weights, biases, n_x, n_hidden)
+    pred = dynamicRNN(X,Cats, Brands,Conds, Tx, weights, biases, n_x, n_hidden)
+
+    # pred = tf.reshape(pred, tf.shape(Y))
 
     print("Shape of pred is " + str(tf.shape(pred)) + " and shape of Y is " + str(tf.shape(Y)))
 
     # Define loss and optimizer
     cost = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(tf.log(pred + 1), tf.log(Y + 1)))))
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate).minimize(cost)
+
     # Evaluate model
     # correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(tf.transpose(Y), 1)) #Argmax over columns
-    # num_correct = tf.reduce_sum(tf.cast(correct_pred, tf.float32), name = "num_correct")
+    # accuracy = tf.metrics.mean_relative_error(labels = Y, predictions = pred)[0]
     accuracy = tf.reduce_mean(tf.divide(tf.abs(tf.subtract(Y,pred)), (Y+1)))
-
+    # accuracy = tf.divide(tf.sqrt(tf.losses.mean_squared_error(Y, pred)), tf.reduce_sum(Y))
+    # accuracy = tf.reduce_sum(tf.s)
 
     # Initialize the variables (i.e. assign their default value)
     init = tf.global_variables_initializer()
-
-    # Initialize the saver
-    saver = tf.train.Saver()
 
     m = Y_train.shape[0]
     num_minibatches = int(math.floor(m/mini_batch_size))
@@ -134,15 +144,18 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
             tot_accuracy = 0
             # extract each miniminibatch_X, miniBatch_Y at each
             #make minimatches here (randomly shuffling across m)
-            minibatches = random_mini_batches(X_train, Y_train, mini_batch_size = mini_batch_size, seed = 0)
+            minibatches = random_mini_batches(X_train, Y_train, trainCategories, trainBrands,trainConditions, mini_batch_size = mini_batch_size, seed = 0)
             for minibatch in minibatches:
-                (minibatch_X, minibatch_Y) = minibatch
+                (minibatch_X, minibatch_Y, mini_batch_categories, mini_batch_brands, mini_batch_conds) = minibatch
                 # Expand mininminibatch_X 
-                minibatch_X = miniBatchIndicesToEmbedding(minibatch_X, Tx)# print ("Shape of minibatch_X is " + str(minibatch_X.shape))
+                minibatch_X = miniBatchIndicesToEmbedding(minibatch_X, Tx)
                 mb_sz = minibatch_Y.shape[0]
                 minibatch_Y = np.reshape(minibatch_Y, (minibatch_Y.shape[0], 1))
-                sess.run(optimizer, feed_dict={X: minibatch_X, Y: minibatch_Y})
-                acc, loss = sess.run([accuracy, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
+                mini_batch_categories, mini_batch_brands, mini_batch_conds = expandOtherArrs(mini_batch_categories, mini_batch_brands, len_cat_vecs, len_brand_vecs, mini_batch_conds)
+                # print ("Shape of minibatch_X is " + str(minibatch_X.shape))
+                sess.run(optimizer, feed_dict={X: minibatch_X, Y: minibatch_Y, Cats: mini_batch_categories, Brands: mini_batch_brands, Conds: mini_batch_conds})
+                sess.run(tf.local_variables_initializer())
+                acc, loss = sess.run([accuracy, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, Cats: mini_batch_categories, Brands: mini_batch_brands, Conds: mini_batch_conds})
                 epoch_cost = epoch_cost + loss
                 tot_accuracy = tot_accuracy + float(acc*mb_sz)
                                                # Tx: Tx})
@@ -156,13 +169,17 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
         print("Optimization Finished!")
         train_accuracy = 0
         train_cost = 0
-        minibatches = random_mini_batches(X_train, Y_train, mini_batch_size = mini_batch_size, seed = 0)
+        minibatches = random_mini_batches(X_train, Y_train, trainCategories, trainBrands, trainConditions,mini_batch_size = mini_batch_size, seed = 0)
+        num_minibatches = int(math.floor(m/mini_batch_size))
         for minibatch in minibatches:
-            (minibatch_X, minibatch_Y) = minibatch
+            (minibatch_X, minibatch_Y, mini_batch_categories, mini_batch_brands, mini_batch_conds) = minibatch
             minibatch_X = miniBatchIndicesToEmbedding(minibatch_X, Tx)
             minibatch_Y = np.reshape(minibatch_Y, (minibatch_Y.shape[0], 1))
             mb_sz = minibatch_Y.shape[0]
-            acc, loss = sess.run([accuracy, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
+            mini_batch_categories, mini_batch_brands, mini_batch_conds = expandOtherArrs(mini_batch_categories, mini_batch_brands, len_cat_vecs, len_brand_vecs, mini_batch_conds)
+            sess.run(tf.local_variables_initializer())
+            acc, loss = sess.run([accuracy, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, Cats: mini_batch_categories, Brands: mini_batch_brands, Conds: mini_batch_conds})
+            train_cost = train_cost + loss
             train_accuracy = train_accuracy + float(acc*mb_sz)
         print("Mean percentage price difference for train set: "+ str(float(100*train_accuracy/m)))
         print("Cost for train set is " + str(train_cost/num_minibatches))
@@ -170,20 +187,20 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
         m = Y_dev.shape[0]
         dev_accuracy = 0
         dev_cost = 0
-        minibatches = random_mini_batches(X_dev, Y_dev, mini_batch_size = mini_batch_size, seed = 0)
+        minibatches = random_mini_batches(X_dev, Y_dev, devCategories, devBrands, devConditions,mini_batch_size = mini_batch_size, seed = 0)
         num_minibatches = int(math.floor(m/mini_batch_size))
         for minibatch in minibatches:
-            (minibatch_X, minibatch_Y) = minibatch
+            (minibatch_X, minibatch_Y, mini_batch_categories, mini_batch_brands, mini_batch_conds) = minibatch
             minibatch_X = miniBatchIndicesToEmbedding(minibatch_X, Tx)
             minibatch_Y = np.reshape(minibatch_Y, (minibatch_Y.shape[0], 1))
             mb_sz = minibatch_Y.shape[0]
-            acc, loss = sess.run([accuracy, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
+            mini_batch_categories, mini_batch_brands, mini_batch_conds = expandOtherArrs(mini_batch_categories, mini_batch_brands, len_cat_vecs, len_brand_vecs, mini_batch_conds)
+            sess.run(tf.local_variables_initializer())
+            acc, loss = sess.run([accuracy, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, Cats: mini_batch_categories, Brands: mini_batch_brands, Conds: mini_batch_conds})
             dev_cost = dev_cost + loss
             dev_accuracy = dev_accuracy + float(acc*mb_sz)
-
         print("Mean percentage price difference for dev set: "+ str(float(100*dev_accuracy/m)))
         print("Cost for dev set is " + str(dev_cost/num_minibatches))
-        saver.save(sess, './model_lstm_w2v_expan_v2')
         sess.close()
         # # Calculate accuracy
         # test_data = testset.data
@@ -194,7 +211,7 @@ def model(X_train, Y_train, X_dev, Y_dev, learning_rate = 0.01, num_epochs = 10,
         #                                   Tx: test_Tx}))
     return
 
-def dynamicRNN(X, Tx, weights, biases, n_x, n_hidden):
+def dynamicRNN(X, Cats, Brands, Conds, Tx, weights, biases, n_x, n_hidden):
 
     # Prepare data shape to match `rnn` function requirements
     # Current data input shape: (m, Tx, n_x)
@@ -239,6 +256,13 @@ def dynamicRNN(X, Tx, weights, biases, n_x, n_hidden):
     Z_out = tf.matmul(dropout, weights['W_out']) + biases['b_out']
     Z_out = tf.nn.relu(Z_out)     
 
+    Others = tf.concat([Cats, Brands,Conds ], axis = 1)
+
+    Z_out = tf.cast(Z_out, tf.int32)
+
+    Z_out = tf.concat([Z_out, Others], axis = 1)
+
+    Z_out = tf.cast(Z_out, tf.float32)
 
     # Deepen Full Netowrk
     Z_out = tf.matmul(Z_out, weights['W_f1']) + biases['b_f1']
@@ -315,7 +339,7 @@ def miniBatchIndicesToEmbedding(minibatch_X, T_x):
                 newArr[i,j,:] = np.array(indexToEmb[indexToW2v])
     return newArr
 
-def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
+def random_mini_batches(X, Y, categories, brands, conds, mini_batch_size = 64, seed = 0):
     """
     Creates a list of random minibatches from (X, Y)
 
@@ -337,22 +361,73 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     print("shape X", X.shape)
     shuffled_X = X[:, permutation]
     shuffled_Y = Y[permutation]  # not sure why we need to reshape here
+    shuffled_categories = categories[permutation]
+    shuffled_brands = brands[permutation]
+    shuffled_conds = conds[permutation]
 
     # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
     num_complete_minibatches = int(math.floor(m/mini_batch_size)) # number of mini batches of size mini_batch_size in your partitionning
     for k in range(0, num_complete_minibatches):
         mini_batch_X = shuffled_X[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
         mini_batch_Y = shuffled_Y[k * mini_batch_size : k * mini_batch_size + mini_batch_size]
-        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batch_categories = shuffled_categories[k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch_brands = shuffled_brands[k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch_conds = shuffled_conds[k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+        mini_batch = (mini_batch_X, mini_batch_Y, mini_batch_categories, mini_batch_brands, mini_batch_conds)
         mini_batches.append(mini_batch)
 
     # Handling the end case (last mini-batch < mini_batch_size)
     if m % mini_batch_size != 0:
         mini_batch_X = shuffled_X[:, num_complete_minibatches * mini_batch_size : m]
         mini_batch_Y = shuffled_Y[num_complete_minibatches * mini_batch_size : m]
-        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batch_categories = shuffled_categories[num_complete_minibatches * mini_batch_size : m]
+        mini_batch_brands = shuffled_brands[num_complete_minibatches * mini_batch_size : m]
+        mini_batch_conds = shuffled_conds[num_complete_minibatches * mini_batch_size : m]
+        mini_batch = (mini_batch_X, mini_batch_Y, mini_batch_categories, mini_batch_brands, mini_batch_conds)
         mini_batches.append(mini_batch)
+
     return mini_batches
+
+def getConditions(df):
+    conditions = []
+    for i in range(len(df['price'])):
+        if (pd.isnull(df['item_condition_id'][i]) == False):
+            conditions.append(int(df['item_condition_id'][i]) - 1) # -1 so that it is the index
+        else:
+            conditions.append(int(len_cond_vecs) - 1)
+    return np.array(conditions)
+
+def getOtherArrs(df):
+    categories = []
+    brands = []
+    for i in range(len(df['price'])):
+        brands.append(int(df['brand-indices'][i]))
+        categories.append(df['categories-indices'][i])
+    return np.array(categories), np.array(brands)
+
+def readCatsAndBrandsFromJSON(filename):
+    Vars = None
+    with open(filename, 'r') as fp:
+        Vars = json.load(fp)
+    return int(Vars['num_categories_indices']), int(Vars['num_brands_indices'])
+
+def expandOtherArrs(categories_conden, brands_conden, len_cat_vecs, len_brand_vecs, conds):
+    categories = []
+    brands = []
+    conditions = []
+    for i in range(brands_conden.shape[0]):
+        categories.append(MultiHot(categories_conden[i], len_cat_vecs))
+        brands.append(OneHot(brands_conden[i], len_brand_vecs))
+        conditions.append(OneHot(conds[i], len_cond_vecs))
+    return np.array(categories), np.array(brands), np.array(conditions)
+
+def MultiHot(List, numBuckets):
+    arr = np.zeros(numBuckets)
+    # Have to do it like this because read_csv defaults the List to really be a string that visibly looks like a list (eg. "[0 1 3]")
+    for i in List.split(' '):
+        if i.isdigit():
+            arr[(int)(i)] = 1
+    return arr    
 
 if __name__ == '__main__':
     main()

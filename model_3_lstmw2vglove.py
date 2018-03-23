@@ -27,6 +27,14 @@ for w in w2v:
     indexToEmb[count] = w2v[w]
     count = count + 1
 
+"""
+This model's architecture is as follows: product descriptions goes into an LSTM cell where each
+word's w2v encoding is used as an input for each time step of the lstm. This is done for the first
+T_x words of each description. Output of last lstm timestep then goes through a softmax output layer
+and output is softmax vector of length 12 corresponding to 12 distinct price buckets. Pre-trained 
+glove-based w2v encodings used.
+"""
+
 def main():
     # Usage is as follows: python model.py <train_enc>.csv <dev_enc>.csv <glove file>
     X_test = []

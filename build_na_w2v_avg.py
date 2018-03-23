@@ -6,6 +6,14 @@ import sys
 import nltk
 import codecs
 
+"""
+Python script writes CSV files from dev, train and test sets. Computes
+w2v vector of each product description by computing the average w2v vector
+for all words in the description. Uses a pre-trained w2v glove file in computing
+mean w2v vectors.
+"""
+
+
 w2v = None
 gloveFile = sys.argv[4]
 with open(gloveFile, "rb") as lines:

@@ -14,6 +14,13 @@ import os
 # import tensorflow_utils
 #from tf_utils import load_dataset, random_mini_batches, convert_to_one_hot, predict
 
+"""
+This model's architecture is as follows: product descriptions' average w2v encodings go into
+a 2-layer FC network. Output is a softmax vector of length 12, corresponding to 12 distinct
+price buckets. Pre-trained glove-based w2v encodings used.
+"""
+
+
 def main():
     # Usage is as follows: python model.py <train_enc>.csv <dev_enc>.csv(optional)
     # Test variables are dummy variables for now

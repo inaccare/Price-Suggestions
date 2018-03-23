@@ -1,3 +1,10 @@
+"""
+Script builds new CSV files from train, dev and test sets to add condensed
+array bag of words representation for each product description. Each condensed
+array has indices for non-zero entries in the corpus.
+"""
+
+
 from collections import Counter
 import numpy as np
 import pandas as pd

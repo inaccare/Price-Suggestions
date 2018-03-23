@@ -11,6 +11,12 @@ from tensorflow.python.framework import ops
 import json
 
 
+"""
+This model's architecture is as follows: product descriptions' bag of words encodings go into
+a 2-layer FC network. Output is a softmax vector of length 12, corresponding to 12 distinct
+price buckets. Baseline model.
+"""
+
 def main():
     # Usage is as follows: python model.py <train_enc>.csv <dev_enc>.csv
 

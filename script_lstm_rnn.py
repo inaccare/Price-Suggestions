@@ -10,19 +10,20 @@ import tensorflow as tf
 from tensorflow.python.framework import ops
 import json
 import nltk
+import gensim
+import multiprocessing
 
 
 w2v = None
-gloveFile = sys.argv[4]
-with open(gloveFile, "rb") as lines:
-    w2v = {line.split()[0]: np.array(line.split()[1:])
-            for line in lines}
+w2vFile = sys.argv[4]
+w2v = gensim.models.word2vec.Word2Vec.load(w2vFile)
+
 wordToIndex = dict()
 indexToEmb = dict()
 count = 1
-for w in w2v:
+for w in w2v.wv.vocab:
     wordToIndex[w] = count
-    indexToEmb[count] = w2v[w]
+    indexToEmb[count] = w2v.wv[w]
     count = count + 1
 
 def main():
@@ -58,7 +59,7 @@ def getProductIndicesAndPrices(df, T_x):
     X = []
     Y = []
     numBuckets = 12
-    for i in range(0, 300):#len(df['item_description'])):#len(df['item_description'])):
+    for i in range(0, len(df['item_description'])):#len(df['item_description'])):
         if (pd.isnull(df['item_description'][i]) == False): # Checks for Nan descriptions
             X.append( (getIndexArrForSentence(df['item_description'][i], T_x)) )
         else:
@@ -76,8 +77,8 @@ def getIndexArrForSentence(sentence, T_x):
         # Only looking at first 72 words!
         if (count == T_x):
             break
-        if w.encode('UTF-8') in w2v:
-            arr[count] = wordToIndex[w.encode('UTF-8')]
+        if w in w2v.wv.vocab:
+            arr[count] = wordToIndex[w]
         count = count + 1
     return arr
 
@@ -147,12 +148,15 @@ def rebuildModel(X_train, X_dev, X_test, Y_train, Y_dev, Y_test, Tx = 72, n_y = 
 
     # Use the saver object normally after that.
     with tf.Session() as sess:
-        saver = tf.train.import_meta_graph('my_test_model.meta')
+        saver = tf.train.import_meta_graph('./model_onlydescriptions_deeplstm_w2v_expan_v2.meta')
         saver.restore(sess, tf.train.latest_checkpoint('./'))
-
+# 
         graph = tf.get_default_graph()
-        X = graph.get_tensor_by_name("X:0")
-        Y = graph.get_tensor_by_name("Y:0")
+        # [print("Name is " + n.name) for n in tf.get_default_graph().as_graph_def().node] # Did this to find recorded name for X and Y tensors
+
+        # X = graph.get_tensor_by_name("X:0")
+        X = graph.get_tensor_by_name("Placeholder_2:0") # Was supposed to be "X:0" but forgot to name tensor in model
+        Y = graph.get_tensor_by_name("Placeholder_1_1:0") # Was supposed to be "Y:0" but forgot to name tensor in model
 
 
         dev_num_correct = miniBatch_calculation(X_train, Y_train, graph, X, Y, sess)
